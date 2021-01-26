@@ -18,4 +18,4 @@
 - ./test.sh
 ![](images/test.png)
 
-## If it helps you, give me a star
+## If it helps you, give me a star please
