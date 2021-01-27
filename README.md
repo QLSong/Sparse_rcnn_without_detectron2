@@ -6,6 +6,7 @@
 - fvcore
 - PyTorch ≥ 1.5
 - opencv
+- torchvision==0.8.2
 
 ## how to train
 - mkdir -p datasets/coco
