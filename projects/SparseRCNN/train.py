@@ -275,7 +275,7 @@ def train(args):
     )
 
     if args.eval_only:
-        eval(model, device, test_loader, logger, evaluator)
+        eval(model.module, device, test_loader, logger, evaluator)
         return
 
     criterion = Loss(cfg).cuda()
