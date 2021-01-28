@@ -4,13 +4,12 @@
 import numpy as np
 import os
 import xml.etree.ElementTree as ET
-# from typing import List, Tuple, Union
 import torch.utils.data as data
 import cv2
 import torch
 
 # fmt: off
-# CLASS_NAMES = (
+# class_names = (
 #     "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat",
 #     "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person",
 #     "pottedplant", "sheep", "sofa", "train", "tvmonitor"
@@ -85,8 +84,8 @@ class VOCDataset(data.Dataset):
             except:
                 print(fileids)
         img = img.transpose(2, 0, 1)
-        img = torch.Tensor(img)
-        img_whwh = torch.Tensor([img.shape[2], img.shape[1], img.shape[2], img.shape[1]])
+        img = torch.from_numpy(img)
+        img_whwh = torch.as_tensor([img.shape[2], img.shape[1], img.shape[2], img.shape[1]])
 
         label = {'num_instances': num_instances,
                   'image_id': fileids,

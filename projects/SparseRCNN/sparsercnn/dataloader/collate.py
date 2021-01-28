@@ -17,7 +17,7 @@ class Collate(object):
 
         img = [self.normalizer(_img) for _img in img]
 
-        image_sizes = torch.Tensor([[im.shape[-2], im.shape[-1]] for im in img])
+        image_sizes = torch.as_tensor([[im.shape[-2], im.shape[-1]] for im in img])
 
         max_size = image_sizes.max(0)[0].int().tolist()
 

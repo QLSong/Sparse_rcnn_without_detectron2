@@ -74,7 +74,16 @@ class CocoDataset(Dataset):
         self.mode = dataset.split('_')[-1]
         self.dataset = dataset.split('_')[-1]+dataset.split('_')[-2]
         self.coco = COCO(self._get_anno_file_name())
-        self.ids = list(self.coco.imgs.keys())
+
+        self.ids = []
+        ids = list(self.coco.imgs.keys())
+        for index in range(len(ids)):
+            img_id = ids[index]
+            ann_ids = self.coco.getAnnIds(imgIds=img_id)
+            target = self.coco.loadAnns(ann_ids)
+            if len(target) > 0:
+                self.ids.append(ids[index])
+
         self.transform = transform
 
         cats = [cat['name']
@@ -115,6 +124,10 @@ class CocoDataset(Dataset):
         dataset = 'test2017' if 'test' in self.dataset else self.dataset
         return os.path.join(images_dir, dataset, file_name)
 
+    def image_aspect_ratio(self, image_index):
+        image = self.coco.loadImgs(self.ids[image_index])[0]
+        return float(image['width']) / float(image['height'])
+
     def __getitem__(self, index):
         """
         Args:
@@ -135,6 +148,7 @@ class CocoDataset(Dataset):
             cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
         )
         h, w, _ = img.shape
+        
         if self.transform is not None:
             img = self.transform(img)
         if self.is_rgb == "RGB":
@@ -143,13 +157,10 @@ class CocoDataset(Dataset):
             except:
                 print(self._get_image_path(file_name).replace('images/', ''))
         img = img.transpose(2, 0, 1)
-        img = torch.Tensor(img)
-        img_whwh = torch.Tensor([img.shape[2], img.shape[1], img.shape[2], img.shape[1]])
-        # print(target)
+        img = torch.from_numpy(img)
+        img_whwh = torch.as_tensor([img.shape[2], img.shape[1], img.shape[2], img.shape[1]])
         gt_boxes = [[t['bbox'][0], t['bbox'][1], t['bbox'][0]+t['bbox'][2], t['bbox'][1]+t['bbox'][3]] for t in target]
         gt_classes = [coco_id_idx_map.index(t['category_id']) for t in target]
-        if len(gt_classes) == 0:
-            return self[index+1]
 
         label = {'num_instances': len(gt_classes),
                   'image_id': img_id,

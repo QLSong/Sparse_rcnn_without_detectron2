@@ -9,14 +9,14 @@ from sparsercnn.evaluation.voc_evaluation import PascalVOCDetectionEvaluator
 from sparsercnn.evaluation.coco_evaluation import COCOEvaluator
 import torch
 import torch.optim as optim
-# from sparsercnn import SparseRCNNDatasetMapper
-from sparsercnn.collate import Collate
+from sparsercnn.dataloader.collate import Collate
 import argparse
-import sparsercnn.transforms as T
+import sparsercnn.dataset.transforms as T
 import os
 import logging
 import time
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+from sparsercnn.dataloader.sampler import AspectRatioBasedSampler, RandomSampler
+from sparsercnn.dataloader.data_parallel import DataParallel
 
 
 def parse_args():
@@ -37,6 +37,13 @@ def parse_args():
                         help = 'model root',
                         type = str,
                         default='')
+    parser.add_argument('--standard-size',
+                        help = 'if true, every gpu has same batch',
+                        action = 'store_true')
+    parser.add_argument('--batch-difference',
+                        help = 'first gpus batch add this value equal others batch',
+                        type = int,
+                        default = 1)
 
     args = parser.parse_args()
 
@@ -75,12 +82,14 @@ def eval(model, device, test_dataloader, logger, evaluator):
     for idx, (image, img_whwh, target) in enumerate(test_dataloader):
         image = image.to(device)
         img_whwh = img_whwh.to(device)
+    
+        y = model(image, img_whwh)
+
         for t in target:
             for k in t.keys():
                 if k in ['gt_boxes', 'gt_classes', 'image_size_xyxy', 'image_size_xyxy_tgt']:
                     t[k] = t[k].to(device)
 
-        y = model(image, img_whwh)
         for j in range(y[1].shape[0]):
             _t = target[j]
             y[1][j] *= torch.Tensor([_t['width'], _t['height'], _t['width'], _t['height']]).to(device)/_t['image_size_xyxy'] 
@@ -117,12 +126,13 @@ def train_one_epoch(epoch, model, device, criterion, train_dataloader, optimizer
 
         image = image.to(device)
         img_whwh = img_whwh.to(device)
+        y = model(image, img_whwh)
+
         for t in target:
             for k in t.keys():
                 if k in ['gt_boxes', 'gt_classes', 'image_size_xyxy', 'image_size_xyxy_tgt']:
                     t[k] = t[k].to(device)
 
-        y = model(image, img_whwh)
         loss = criterion(y, target)
         
         total_loss = 0
@@ -221,26 +231,38 @@ def train(args):
 
     if cfg.MODEL.DEVICE == 'cuda':
         model = model.cuda()
-        model = torch.nn.DataParallel(model)
+        if not args.standard_size and args.num_gpus > 1:
+            _gpus = range(args.num_gpus)
+            chunk_sizes = [cfg.SOLVER.IMS_PER_BATCH - args.batch_difference]
+            rest_batch_size = (cfg.SOLVER.IMS_PER_BATCH*len(_gpus) - chunk_sizes[0])
+            for i in range(len(_gpus) - 1):
+                slave_chunk_size = rest_batch_size // (len(_gpus) - 1)
+                if i < rest_batch_size % (len(_gpus) - 1):
+                    slave_chunk_size += 1
+                chunk_sizes.append(slave_chunk_size)
+            model = DataParallel(model, device_ids=_gpus, chunk_sizes=chunk_sizes).cuda()
+        else:
+            model = torch.nn.DataParallel(model)
 
     if cfg.DATASETS.TRAIN[0].startswith('voc'):
         train_dataset = VOCDataset(cfg, 'train', transforms)
         test_dataset = VOCDataset(cfg, 'val', test_transforms)
+        train_sampler = RandomSampler(train_dataset, batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, drop_last=True)
         evaluator = PascalVOCDetectionEvaluator(cfg.DATASETS.TEST[0], logger)
     elif cfg.DATASETS.TRAIN[0].startswith('coco'):
         train_dataset = CocoDataset(cfg, 'train', transforms)
         test_dataset = CocoDataset(cfg, 'val', test_transforms)
+        train_sampler = AspectRatioBasedSampler(train_dataset, batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, drop_last=True)
         evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], logger)
     else:
         raise('dataset not support!!!')
+
     train_loader = torch.utils.data.DataLoader(
         train_dataset, 
-        batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, 
-        shuffle=True,
         num_workers=cfg.DATALOADER.NUM_WORKERS,
         pin_memory=True,
-        collate_fn=Collate(cfg)
-        # drop_last=True
+        collate_fn=Collate(cfg),
+        batch_sampler=train_sampler
     )
 
     test_loader = torch.utils.data.DataLoader(
@@ -277,8 +299,8 @@ def train(args):
         torch.save(state, cfg.OUTPUT_DIR + '/model_final.pth.tar')
         logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_final.pth.tar')
         
-        if epoch % 10 ==0:
-            eval(model, device, test_loader, logger, evaluator)
+        if epoch % 10 == 0 and epoch != 0:
+            eval(model.module, device, test_loader, logger, evaluator)
 
 
 if __name__ == '__main__':
