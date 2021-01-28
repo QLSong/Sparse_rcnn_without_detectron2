@@ -4,9 +4,6 @@ import numpy as np
 import time
 from pycocotools.cocoeval import COCOeval
 
-from detectron2 import _C
-
-
 class COCOeval_opt(COCOeval):
     """
     This is a slightly modified version of the original COCO API, where the functions evaluateImg()
