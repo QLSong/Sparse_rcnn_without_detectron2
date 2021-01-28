@@ -1,0 +1,1 @@
+python projects/SparseRCNN/demo.py --config-file projects/SparseRCNN/configs/sparsercnn.res50.100pro.3x.yaml
