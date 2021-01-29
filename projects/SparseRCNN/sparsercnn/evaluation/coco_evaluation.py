@@ -15,7 +15,6 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from tabulate import tabulate
 from ..util.box_ops import box_xyxy_to_xywh
-from .fast_eval_api import COCOeval_opt
 from ..dataset.coco import coco_id_idx_map
 
 class COCOEvaluator:
@@ -424,8 +423,7 @@ def _evaluate_predictions_on_coco(
     assert len(coco_results) > 0
 
     coco_dt = coco_gt.loadRes(coco_results)
-    coco_eval = (COCOeval_opt if use_fast_impl else COCOeval)(coco_gt, coco_dt, iou_type)
-    # coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
+    coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
     if img_ids is not None:
         coco_eval.params.imgIds = img_ids
 
