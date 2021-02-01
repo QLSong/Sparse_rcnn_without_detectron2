@@ -76,8 +76,8 @@ class FPN(nn.Module):
                 bias=use_bias,
                 norm=output_norm,
             )
-            # weight_init.c2_xavier_fill(lateral_conv)
-            # weight_init.c2_xavier_fill(output_conv)
+            weight_init.c2_xavier_fill(lateral_conv.conv2d)
+            weight_init.c2_xavier_fill(output_conv.conv2d)
             stage = int(math.log2(strides[idx]))
             stages.append(stage)
             self.add_module("fpn_lateral{}".format(stage), lateral_conv)

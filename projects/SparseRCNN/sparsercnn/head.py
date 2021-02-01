@@ -19,7 +19,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn.init import xavier_uniform_
-from torch.nn.init import constant_
+from torch.nn.init import constant_, kaiming_uniform_
 
 from .poolers import ROIPooler
 import torchvision
@@ -134,7 +134,7 @@ class MultiheadAttention(nn.Module):
 
     def _reset_parameters(self):
         xavier_uniform_(self.in_proj_weight)
-        xavier_uniform_(self.out_proj.weight)
+        kaiming_uniform_(self.out_proj.weight, a=math.sqrt(5))
         constant_(self.in_proj_bias, 0.)
         constant_(self.out_proj.bias, 0.)
 
