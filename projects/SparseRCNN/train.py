@@ -275,6 +275,7 @@ def train(args):
     )
 
     if args.eval_only:
+        evaluator.reset()
         eval(model.module, device, test_loader, logger, evaluator)
         return
 
@@ -300,6 +301,7 @@ def train(args):
         logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_final.pth.tar')
         
         if epoch % 10 == 0 and epoch != 0:
+            evaluator.reset()
             eval(model.module, device, test_loader, logger, evaluator)
 
 
