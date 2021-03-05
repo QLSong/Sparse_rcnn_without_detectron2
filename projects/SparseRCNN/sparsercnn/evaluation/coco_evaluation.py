@@ -15,6 +15,7 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from tabulate import tabulate
 from ..util.box_ops import box_xyxy_to_xywh
+from .fast_eval_api import COCOeval_opt
 from ..dataset.coco import coco_id_idx_map
 
 class COCOEvaluator:
@@ -144,12 +145,12 @@ class COCOEvaluator:
         coco_results = list(itertools.chain(*[x["instances"] for x in predictions]))
         tasks = self._tasks or self._tasks_from_predictions(coco_results)
 
-        # if self._output_dir:
-        #     file_path = os.path.join(self._output_dir, "coco_instances_results.json")
-        #     self._logger.info("Saving results to {}".format(file_path))
-        #     with open(file_path, "w") as f:
-        #         f.write(json.dumps(coco_results))
-        #         f.flush()
+        if self._output_dir:
+            file_path = os.path.join(self._output_dir, "coco_instances_results.json")
+            self._logger.info("Saving results to {}".format(file_path))
+            with open(file_path, "w") as f:
+                f.write(json.dumps(coco_results))
+                f.flush()
 
         for task in sorted(tasks):
             coco_eval = (
@@ -281,24 +282,25 @@ def instances_to_coco_json(instances, img_id):
     Returns:
         list[dict]: list of json annotations in COCO format.
     """
-    num_instance = instances[0].shape[0]
+    num_instance = instances[0][0].shape[0]
     if num_instance == 0:
         return []
 
-    boxes = box_xyxy_to_xywh(instances[1]).cpu().tolist()
-    scores = instances[0].cpu().tolist()
-    classes = instances[2].cpu().tolist()
+    boxes = box_xyxy_to_xywh(instances[1][0]).cpu().tolist()
+    scores = instances[0][0].cpu().tolist()
+    classes = instances[2][0].cpu().tolist()
+    # print(len(boxes), len(scores), len(classes))
 
     results = []
     for k in range(num_instance):
-        for box, score, cls in zip(boxes[k], scores[k], classes[k]):
-            result = {
-                "image_id": img_id,
-                "category_id": coco_id_idx_map[cls],
-                "bbox": box,
-                "score": score,
-            }
-            results.append(result)
+        # for box, score, cls in zip(boxes[k], scores[k], classes[k]):
+        result = {
+            "image_id": img_id,
+            "category_id": coco_id_idx_map[classes[k]],
+            "bbox": boxes[k],
+            "score": scores[k],
+        }
+        results.append(result)
     return results
 
 
@@ -423,6 +425,7 @@ def _evaluate_predictions_on_coco(
     assert len(coco_results) > 0
 
     coco_dt = coco_gt.loadRes(coco_results)
+    # coco_eval = (COCOeval_opt if use_fast_impl else COCOeval)(coco_gt, coco_dt, iou_type)
     coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
     if img_ids is not None:
         coco_eval.params.imgIds = img_ids

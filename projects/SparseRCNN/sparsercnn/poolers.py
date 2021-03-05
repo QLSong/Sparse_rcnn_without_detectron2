@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import math
 from torchvision.ops.roi_align import RoIAlign, roi_align
+from torchvision.ops.roi_pool import RoIPool
 
 def nonzero_tuple(x):
     """
@@ -110,14 +111,19 @@ class ROIPooler(nn.Module):
         assert len(output_size) == 2
         assert isinstance(output_size[0], int) and isinstance(output_size[1], int)
         self.output_size = output_size
-        assert pooler_type == "ROIAlignV2"
-
-        self.level_poolers = nn.ModuleList(
-            RoIAlign(
-                output_size, spatial_scale=scale, sampling_ratio=sampling_ratio, aligned=True
+        if pooler_type == "ROIAlignV2":
+            self.level_poolers = nn.ModuleList(
+                RoIAlign(
+                    output_size, spatial_scale=scale, sampling_ratio=sampling_ratio, aligned=True
+                )
+                for scale in scales
             )
-            for scale in scales
-        )
+        elif pooler_type == "ROIPool":
+            self.level_poolers = nn.ModuleList(
+                RoIPool(output_size, spatial_scale=scale) for scale in scales
+            )
+        else:
+            raise('unknown pooler type!!!')
         self.scales = scales
         self.sampling_ratio = sampling_ratio
         

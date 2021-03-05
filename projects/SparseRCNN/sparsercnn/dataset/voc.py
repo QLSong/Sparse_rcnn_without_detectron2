@@ -4,6 +4,7 @@
 import numpy as np
 import os
 import xml.etree.ElementTree as ET
+# from typing import List, Tuple, Union
 import torch.utils.data as data
 import cv2
 import torch
@@ -54,7 +55,6 @@ class VOCDataset(data.Dataset):
         anno_file = os.path.join(self.annotations_root, fileids + ".xml")
         jpeg_file = os.path.join(self.images_root, fileids + ".jpg")
 
-        # with PathManager.open(anno_file) as f:
         tree = ET.parse(anno_file)
 
         gt_boxes = []
@@ -65,8 +65,6 @@ class VOCDataset(data.Dataset):
             cls = obj.find("name").text
             bbox = obj.find("bndbox")
             bbox = [float(bbox.find(x).text) for x in ["xmin", "ymin", "xmax", "ymax"]]
-            bbox[0] -= 1.0
-            bbox[1] -= 1.0
             if cls == 'car' or cls == 'bus' or cls == 'vehicle':
                 cls = 'vehicle'
             else:
@@ -77,12 +75,14 @@ class VOCDataset(data.Dataset):
         img = cv2.imread(jpeg_file)
         h, w, _ = img.shape
         if self.transform is not None:
-            img = self.transform(img)
+            img, gt_boxes = self.transform(img, gt_boxes)
+
         if self.is_rgb == "RGB":
             try:
                 img = img[:, :, [2,1,0]]
             except:
                 print(fileids)
+
         img = img.transpose(2, 0, 1)
         img = torch.from_numpy(img)
         img_whwh = torch.as_tensor([img.shape[2], img.shape[1], img.shape[2], img.shape[1]])
@@ -91,10 +91,9 @@ class VOCDataset(data.Dataset):
                   'image_id': fileids,
                   'height': h,
                   'width': w,
-                  'gt_boxes': torch.Tensor(gt_boxes)/torch.Tensor([w, h, w, h])*img_whwh,
+                  'gt_boxes': torch.Tensor(gt_boxes),
                   'gt_classes': torch.LongTensor(gt_classes),
                   'image_size_xyxy': img_whwh,
                   'image_size_xyxy_tgt': img_whwh.unsqueeze(0).repeat(len(gt_boxes), 1)
                   }
-        
         return img, img_whwh, label

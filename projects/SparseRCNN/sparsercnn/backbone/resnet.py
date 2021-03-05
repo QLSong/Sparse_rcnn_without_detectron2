@@ -8,9 +8,6 @@ from torch import nn
 
 from .layers import Conv2d, DeformConv, ModulatedDeformConv, ShapeSpec, get_norm
 
-# from .backbone import Backbone
-# from .build import BACKBONE_REGISTRY
-
 __all__ = [
     "ResNetBlockBase",
     "BasicBlock",
@@ -23,7 +20,6 @@ __all__ = [
 ]
 
 
-# class BasicBlock(CNNBlockBase):
 class BasicBlock(nn.Module):
     """
     The basic residual block for ResNet-18 and ResNet-34 defined in :paper:`ResNet`,
@@ -39,8 +35,10 @@ class BasicBlock(nn.Module):
             norm (str or callable): normalization for all conv layers.
                 See :func:`layers.get_norm` for supported format.
         """
-        # super().__init__(in_channels, out_channels, stride)
         super(BasicBlock, self).__init__()
+        self.stride = stride
+        self.out_channels = out_channels
+        self.in_channels = in_channels
 
         if in_channels != out_channels:
             self.shortcut = Conv2d(
@@ -74,7 +72,7 @@ class BasicBlock(nn.Module):
             norm=get_norm(norm, out_channels),
         )
 
-        for layer in [self.conv1, self.conv2, self.shortcut]:
+        for layer in [self.conv1.conv2d, self.conv2.conv2d]:#, self.shortcut.conv2d]:
             if layer is not None:  # shortcut can be None
                 weight_init.c2_msra_fill(layer)
 
@@ -92,8 +90,6 @@ class BasicBlock(nn.Module):
         out = F.relu_(out)
         return out
 
-
-# class BottleneckBlock(CNNBlockBase):
 class BottleneckBlock(nn.Module):
     """
     The standard bottleneck residual block used by ResNet-50, 101 and 152
@@ -178,7 +174,6 @@ class BottleneckBlock(nn.Module):
         )
 
     def forward(self, x):
-        # print(x.device, self.conv1.conv2d.weight.device)
         out = self.conv1(x)
         out = F.relu_(out)
 
@@ -218,7 +213,6 @@ class DeformBottleneckBlock(nn.Module):
         deform_modulated=False,
         deform_num_groups=1,
     ):
-        # super().__init__(in_channels, out_channels, stride)
         super(DeformBottleneckBlock, self).__init__()
         self.stride = stride
         self.in_channels = in_channels
@@ -319,7 +313,6 @@ class DeformBottleneckBlock(nn.Module):
         return out
 
 
-# class BasicStem(CNNBlockBase):
 class BasicStem(nn.Module):
     """
     The standard ResNet stem (layers before the first residual block).
@@ -331,7 +324,6 @@ class BasicStem(nn.Module):
             norm (str or callable): norm after the first conv layer.
                 See :func:`layers.get_norm` for supported format.
         """
-        # super().__init__(in_channels, out_channels, 4)
         super(BasicStem, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -345,7 +337,6 @@ class BasicStem(nn.Module):
             bias=False,
             norm=get_norm(norm, out_channels),
         )
-        # weight_init.c2_msra_fill(self.conv1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -380,12 +371,9 @@ class ResNet(nn.Module):
         self._out_feature_channels = {"stem": self.stem.out_channels}
 
         self.stage_names, self.stages = [], []
-        # for i, blocks in enumerate(stages):
         for i, stage_kargs in enumerate(stages):
             blocks = self.make_stage(**stage_kargs)
             assert len(blocks) > 0, len(blocks)
-            # for block in blocks:
-            #     assert isinstance(block, CNNBlockBase), block
 
             name = "res" + str(i + 2)
             stage = nn.Sequential(*blocks)
@@ -429,14 +417,9 @@ class ResNet(nn.Module):
         assert x.dim() == 4, f"ResNet takes an input of shape (N, C, H, W). Got {x.shape} instead!"
         outputs = {}
         x = self.stem(x)
-        # print(x.device,self.res2[0].conv1.conv2d.weight.device)
-        # print(getattr(self, 'res2'))
         if "stem" in self._out_features:
             outputs["stem"] = x
         for name, stage in zip(self.stage_names, self.stages):
-            # print(x.device, stage[0].conv1.conv2d.weight.device, name)
-            # print(torch.sum(self.res2[0].conv1.conv2d.weight-stage[0].conv1.conv2d.weight))
-            # x = stage(x)
             x = getattr(self, name)(x)
             if name in self._out_features:
                 outputs[name] = x
@@ -456,31 +439,6 @@ class ResNet(nn.Module):
             for name in self._out_features
         }
 
-    # def freeze(self, freeze_at=0):
-    #     """
-    #     Freeze the first several stages of the ResNet. Commonly used in
-    #     fine-tuning.
-
-    #     Layers that produce the same feature map spatial size are defined as one
-    #     "stage" by :paper:`FPN`.
-
-    #     Args:
-    #         freeze_at (int): number of stages to freeze.
-    #             `1` means freezing the stem. `2` means freezing the stem and
-    #             one residual stage, etc.
-
-    #     Returns:
-    #         nn.Module: this ResNet itself
-    #     """
-    #     if freeze_at >= 1:
-    #         self.stem.freeze()
-    #     for idx, stage in enumerate(self.stages, start=2):
-    #         if freeze_at >= idx:
-    #             for block in stage.children():
-    #                 block.freeze()
-    #     return self
-
-    # @staticmethod
     def make_stage(self,
         block_class, num_blocks, first_stride=None, *, in_channels, out_channels, **kwargs
     ):
@@ -515,7 +473,6 @@ class ResNet(nn.Module):
         return blocks
 
 
-# ResNetBlockBase = CNNBlockBase
 """
 Alias for backward compatibiltiy.
 """
@@ -609,10 +566,8 @@ def build_resnet_backbone(cfg, input_shape):
                 stage_kargs["deform_num_groups"] = deform_num_groups
             else:
                 stage_kargs["block_class"] = BottleneckBlock
-        # blocks = ResNet.make_stage(**stage_kargs)
         in_channels = out_channels
         out_channels *= 2
         bottleneck_channels *= 2
-        # stages.append(blocks)
         stages.append(stage_kargs)
     return ResNet(stem, stages, out_features=out_features)

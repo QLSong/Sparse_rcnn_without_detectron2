@@ -6,10 +6,10 @@ class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, image):
+    def __call__(self, image, boxes):
         for t in self.transforms:
-            image = t(image)
-        return image
+            image, boxes = t(image, boxes)
+        return image, boxes
 
     def __repr__(self):
         format_string = self.__class__.__name__ + "("
@@ -23,29 +23,13 @@ class RandomFlip(object):
     def __init__(self, prob=0.5):
         self.prob = prob
 
-    def __call__(self, image):
+    def __call__(self, image, boxes):
+        h, w, _ = image.shape
         if random.random() < self.prob:
+            for _box in boxes:
+                _box[0], _box[2] = w - _box[2], w - _box[0]
             image = image[:, ::-1] #- np.zeros_like(image)
-        return image
-
-class CropTransform(object):
-    def __init__(
-        self,
-        x0: int,
-        y0: int,
-        w: int,
-        h: int,
-    ):
-        self.x0 = x0
-        self.y0 = y0
-        self.w = w
-        self.h = h
-
-    def __call__(self, img):
-        if len(img.shape) <= 3:
-            return img[self.y0 : self.y0 + self.h, self.x0 : self.x0 + self.w]
-        else:
-            return img[..., self.y0 : self.y0 + self.h, self.x0 : self.x0 + self.w, :]
+        return image, boxes
 
 class ResizeTransform(object):
     """
@@ -66,9 +50,15 @@ class ResizeTransform(object):
         self.new_h = new_h
         self.new_w = new_w
 
-    def __call__(self, img):
+    def __call__(self, img, boxes):
+        h, w, _ = img.shape
         img = cv2.resize(img, (self.new_w, self.new_h))
-        return img
+        for _box in boxes:
+            _box[0] *= self.new_w / w
+            _box[1] *= self.new_h / h
+            _box[2] *= self.new_w / w
+            _box[3] *= self.new_h / h
+        return img, boxes
 
 class ResizeShortestEdge(object):
     """
@@ -90,8 +80,6 @@ class ResizeShortestEdge(object):
         assert sample_style in ["range", "choice"], sample_style
 
         self.is_range = sample_style == "range"
-        # if isinstance(short_edge_length, int):
-        # self.short_edge_length = (short_edge_length, short_edge_length)
         self.short_edge_length = short_edge_length
         self.max_size = max_size
         self.sample_style = sample_style
@@ -102,14 +90,12 @@ class ResizeShortestEdge(object):
                 f" Got {short_edge_length}!"
             )
 
-    def __call__(self, image):
+    def __call__(self, image, boxes):
         h, w = image.shape[:2]
         if self.is_range:
             size = np.random.randint(self.short_edge_length[0], self.short_edge_length[1] + 1)
         else:
             size = np.random.choice(self.short_edge_length)
-        # if size == 0:
-        #     return NoOpTransform()
 
         scale = size * 1.0 / min(h, w)
         if h < w:
@@ -123,55 +109,4 @@ class ResizeShortestEdge(object):
         neww = int(neww + 0.5)
         newh = int(newh + 0.5)
 
-        return ResizeTransform(h, w, newh, neww, self.interp)(image)
-
-class RandomCrop(object):
-    """
-    Randomly crop a subimage out of an image.
-    """
-
-    def __init__(self, crop_type, crop_size):
-        """
-        Args:
-            crop_type (str): one of "relative_range", "relative", "absolute", "absolute_range".
-                See `config/defaults.py` for explanation.
-            crop_size (tuple[float]): the relative ratio or absolute pixels of
-                height and width
-        """
-        assert crop_type in ["relative_range", "relative", "absolute", "absolute_range"]
-        self.crop_type = crop_type
-        self.crop_size = crop_size
-
-    def __call__(self, image):
-        h, w = image.shape[:2]
-        croph, cropw = self.get_crop_size((h, w))
-        assert h >= croph and w >= cropw, "Shape computation in {} has bugs.".format(self)
-        h0 = np.random.randint(h - croph + 1)
-        w0 = np.random.randint(w - cropw + 1)
-        return CropTransform(w0, h0, cropw, croph)(image)
-
-    def get_crop_size(self, image_size):
-        """
-        Args:
-            image_size (tuple): height, width
-
-        Returns:
-            crop_size (tuple): height, width in absolute pixels
-        """
-        h, w = image_size
-        if self.crop_type == "relative":
-            ch, cw = self.crop_size
-            return int(h * ch + 0.5), int(w * cw + 0.5)
-        elif self.crop_type == "relative_range":
-            crop_size = np.asarray(self.crop_size, dtype=np.float32)
-            ch, cw = crop_size + np.random.rand(2) * (1 - crop_size)
-            return int(h * ch + 0.5), int(w * cw + 0.5)
-        elif self.crop_type == "absolute":
-            return (min(self.crop_size[0], h), min(self.crop_size[1], w))
-        elif self.crop_type == "absolute_range":
-            assert self.crop_size[0] <= self.crop_size[1]
-            ch = np.random.randint(min(h, self.crop_size[0]), min(h, self.crop_size[1]) + 1)
-            cw = np.random.randint(min(w, self.crop_size[0]), min(w, self.crop_size[1]) + 1)
-            return ch, cw
-        else:
-            NotImplementedError("Unknown crop type {}".format(self.crop_type))
+        return ResizeTransform(h, w, newh, neww, self.interp)(image, boxes)

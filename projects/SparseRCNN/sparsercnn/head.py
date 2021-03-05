@@ -134,6 +134,7 @@ class MultiheadAttention(nn.Module):
 
     def _reset_parameters(self):
         xavier_uniform_(self.in_proj_weight)
+        xavier_uniform_(self.out_proj.weight)
         kaiming_uniform_(self.out_proj.weight, a=math.sqrt(5))
         constant_(self.in_proj_bias, 0.)
         constant_(self.out_proj.bias, 0.)
@@ -171,7 +172,7 @@ class RCNNHead(nn.Module):
         self.d_model = d_model
 
         # dynamic.
-        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         self.inst_interact = DynamicConv(cfg)
 
         self.linear1 = nn.Linear(d_model, dim_feedforward)
@@ -234,7 +235,7 @@ class RCNNHead(nn.Module):
 
         # self_att.
         pro_features = pro_features.view(N, nr_boxes, self.d_model).permute(1, 0, 2)
-        pro_features2 = self.self_attn(pro_features, pro_features, value=pro_features)#[0]
+        pro_features2 = self.self_attn(pro_features, pro_features, value=pro_features)[0]
         pro_features = pro_features + self.dropout1(pro_features2)
         pro_features = self.norm1(pro_features)
 
@@ -309,10 +310,10 @@ class DynamicConv(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        self.hidden_dim = cfg.MODEL.SparseRCNN.HIDDEN_DIM
-        self.dim_dynamic = cfg.MODEL.SparseRCNN.DIM_DYNAMIC
-        self.num_dynamic = cfg.MODEL.SparseRCNN.NUM_DYNAMIC
-        self.num_params = self.hidden_dim * self.dim_dynamic
+        self.hidden_dim = cfg.MODEL.SparseRCNN.HIDDEN_DIM # 256
+        self.dim_dynamic = cfg.MODEL.SparseRCNN.DIM_DYNAMIC # 64
+        self.num_dynamic = cfg.MODEL.SparseRCNN.NUM_DYNAMIC # 2
+        self.num_params = self.hidden_dim * self.dim_dynamic # 64*256
         self.dynamic_layer = nn.Linear(self.hidden_dim, self.num_dynamic * self.num_params)
 
         self.norm1 = nn.LayerNorm(self.dim_dynamic)

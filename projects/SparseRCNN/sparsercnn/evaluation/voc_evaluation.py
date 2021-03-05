@@ -107,14 +107,13 @@ class PascalVOCDetectionEvaluator:
                 self._predictions[cls].append(
                     f"{image_id} {score:.3f} {xmin:.1f} {ymin:.1f} {xmax:.1f} {ymax:.1f}"
                 )
-        # print(self._predictions)
 
     def evaluate(self):
         """
         Returns:
             dict: has a key "segm", whose value is a dict of "AP", "AP50", and "AP75".
         """
-        all_predictions = [self._predictions] #gather(self._predictions, dst=0)
+        all_predictions = [self._predictions]
 
         predictions = defaultdict(list)
         for predictions_per_rank in all_predictions:

@@ -38,8 +38,6 @@ class SparseRCNN(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        self.device = torch.device(cfg.MODEL.DEVICE)
-
         self.in_features = cfg.MODEL.ROI_HEADS.IN_FEATURES
         self.num_classes = cfg.MODEL.SparseRCNN.NUM_CLASSES
         self.num_proposals = cfg.MODEL.SparseRCNN.NUM_PROPOSALS
@@ -67,27 +65,36 @@ class SparseRCNN(nn.Module):
         self.deep_supervision = cfg.MODEL.SparseRCNN.DEEP_SUPERVISION
         self.use_focal = cfg.MODEL.SparseRCNN.USE_FOCAL
 
-        self.to(self.device)
-
     def build_backbone(self, cfg):
         input_shape = ShapeSpec(channels=len(cfg.MODEL.PIXEL_MEAN))
-        bottom_up = build_resnet_backbone(cfg, input_shape)
-
-        filename = cfg.MODEL.WEIGHTS
-        if filename.endswith(".pkl"):
-            with open(filename, "rb") as f:
-                data = pickle.load(f, encoding="latin1")
-            if "model" in data and "__author__" in data:
-                state_dict = {}
-                for k, v in data['model'].items():
-                    if ('conv' in k or 'shortcut' in k) and 'norm' not in k:
-                        if 'weight' in k:
-                            state_dict[k.replace('weight', 'conv2d.weight')] = torch.from_numpy(v).float()
-                        if 'bias' in k:
-                            state_dict[k.replace('bias', 'conv2d.bias')] = torch.from_numpy(v).float()
-                    elif 'fc' not in k:
-                        state_dict[k] = torch.from_numpy(v).float()
-                bottom_up.load_state_dict(state_dict)
+        if cfg.MODEL.BACKBONE.NAME == 'build_resnet_fpn_backbone':
+            bottom_up = build_resnet_backbone(cfg, input_shape)
+            filename = cfg.MODEL.WEIGHTS
+            if filename.endswith(".pkl"):
+                with open(filename, "rb") as f:
+                    data = pickle.load(f, encoding="latin1")
+                if "model" in data and "__author__" in data:
+                    state_dict = {}
+                    for k, v in data['model'].items():
+                        if ('conv' in k or 'shortcut' in k) and 'norm' not in k:
+                            if 'weight' in k:
+                                state_dict[k.replace('weight', 'conv2d.weight')] = torch.from_numpy(v).float()
+                            if 'bias' in k:
+                                state_dict[k.replace('bias', 'conv2d.bias')] = torch.from_numpy(v).float()
+                        elif 'fc' not in k:
+                            state_dict[k] = torch.from_numpy(v).float()
+                    bottom_up.load_state_dict(state_dict)
+        elif cfg.MODEL.BACKBONE.NAME == 'build_resnet_torchvision_fpn_backbone':
+            from .backbone.resnet_torchvision import resnet18
+            bottom_up = resnet18(pretrained=True)
+        elif cfg.MODEL.BACKBONE.NAME == 'build_mobilenet_fpn_backbone':
+            from .backbone.mobilenet import mobilenet_v2
+            bottom_up = mobilenet_v2(pretrained=True)
+        elif cfg.MODEL.BACKBONE.NAME == 'build_pelee_fpn_backbone':
+            from .backbone.pelee import PeleeNet
+            bottom_up = PeleeNet()
+        else:
+            raise('not support backbone!!!')
 
         in_features = cfg.MODEL.FPN.IN_FEATURES
         out_channels = cfg.MODEL.FPN.OUT_CHANNELS
@@ -168,11 +175,5 @@ class Loss(nn.Module):
                                       use_focal=self.use_focal)
 
     def forward(self, output, targets):
-
         loss_dict = self.criterion(output, targets)
-        weight_dict = self.criterion.weight_dict
-        for k in loss_dict.keys():
-            if k in weight_dict:
-                loss_dict[k] *= weight_dict[k]
-                
         return loss_dict

@@ -6,10 +6,6 @@ from torch import nn
 
 from .layers import Conv2d, ShapeSpec, get_norm
 
-# from .backbone import Backbone
-# from .build import BACKBONE_REGISTRY
-from .resnet import build_resnet_backbone
-
 __all__ = ["build_resnet_fpn_backbone", "build_retinanet_resnet_fpn_backbone", "FPN"]
 
 
@@ -46,14 +42,12 @@ class FPN(nn.Module):
                 which takes the element-wise mean of the two.
         """
         super(FPN, self).__init__()
-        # assert isinstance(bottom_up, Backbone)
         assert in_features, in_features
 
         # Feature map strides and channels from the bottom up network (e.g. ResNet)
         input_shapes = bottom_up.output_shape()
         strides = [input_shapes[f].stride for f in in_features]
         in_channels_per_feature = [input_shapes[f].channels for f in in_features]
-
         _assert_strides_are_log2_contiguous(strides)
         lateral_convs = []
         output_convs = []
@@ -127,28 +121,20 @@ class FPN(nn.Module):
                 paper convention: "p<stage>", where stage has stride = 2 ** stage e.g.,
                 ["p2", "p3", ..., "p6"].
         """
-        # print(x.device, self.lateral_convs[0].conv2d.weight.device, self.bottom_up.res2[0].conv1.conv2d.weight.device)
         bottom_up_features = self.bottom_up(x)
         results = []
-        # prev_features = self.lateral_convs[0](bottom_up_features[self.in_features[-1]])
-        # results.append(self.output_convs[0](prev_features))
         prev_features = getattr(self, "fpn_lateral{}".format(self.stages[0]))(bottom_up_features[self.in_features[-1]])
         results.append(getattr(self, "fpn_output{}".format(self.stages[0]))(prev_features))
 
         # Reverse feature maps into top-down order (from low to high resolution)
-        # for features, lateral_conv, output_conv in zip(
-        #     self.rev_in_features[1:], self.lateral_convs[1:], self.output_convs[1:]
-        # ):
         for features, stage in zip(self.rev_in_features[1:], self.stages[1:]):
             features = bottom_up_features[features]
             top_down_features = F.interpolate(prev_features, scale_factor=2.0, mode="nearest")
             # Has to use explicit forward due to https://github.com/pytorch/pytorch/issues/47336
-            # lateral_features = lateral_conv.forward(features)
             lateral_features = getattr(self, "fpn_lateral{}".format(stage)).forward(features)
             prev_features = lateral_features + top_down_features
             if self._fuse_type == "avg":
                 prev_features /= 2
-            # results.insert(0, output_conv.forward(prev_features))
             results.insert(0, getattr(self, "fpn_output{}".format(stage)).forward(prev_features))
 
         if self.top_block is not None:
@@ -213,50 +199,3 @@ class LastLevelP6P7(nn.Module):
         p6 = self.p6(c5)
         p7 = self.p7(F.relu(p6))
         return [p6, p7]
-
-
-# @BACKBONE_REGISTRY.register()
-# def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
-#     """
-#     Args:
-#         cfg: a detectron2 CfgNode
-
-#     Returns:
-#         backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
-#     """
-#     bottom_up = build_resnet_backbone(cfg, input_shape)
-#     in_features = cfg.MODEL.FPN.IN_FEATURES
-#     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-#     backbone = FPN(
-#         bottom_up=bottom_up,
-#         in_features=in_features,
-#         out_channels=out_channels,
-#         norm=cfg.MODEL.FPN.NORM,
-#         top_block=LastLevelMaxPool(),
-#         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-#     )
-#     return backbone
-
-
-# @BACKBONE_REGISTRY.register()
-# def build_retinanet_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
-#     """
-#     Args:
-#         cfg: a detectron2 CfgNode
-
-#     Returns:
-#         backbone (Backbone): backbone module, must be a subclass of :class:`Backbone`.
-#     """
-#     bottom_up = build_resnet_backbone(cfg, input_shape)
-#     in_features = cfg.MODEL.FPN.IN_FEATURES
-#     out_channels = cfg.MODEL.FPN.OUT_CHANNELS
-#     in_channels_p6p7 = bottom_up.output_shape()["res5"].channels
-#     backbone = FPN(
-#         bottom_up=bottom_up,
-#         in_features=in_features,
-#         out_channels=out_channels,
-#         norm=cfg.MODEL.FPN.NORM,
-#         top_block=LastLevelP6P7(in_channels_p6p7, out_channels),
-#         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
-#     )
-#     return backbone

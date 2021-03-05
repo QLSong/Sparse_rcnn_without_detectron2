@@ -18,7 +18,6 @@ import time
 from sparsercnn.dataloader.sampler import AspectRatioBasedSampler, RandomSampler
 from sparsercnn.dataloader.data_parallel import DataParallel
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')
     # general
@@ -29,7 +28,7 @@ def parse_args():
     parser.add_argument('--num-gpus',
                         help = 'num of gpus',
                         type = int,
-                        default = 2)
+                        default = 1)
     parser.add_argument('--eval-only',
                         help = 'only evalution',
                         action='store_true')
@@ -43,7 +42,7 @@ def parse_args():
     parser.add_argument('--batch-difference',
                         help = 'first gpus batch add this value equal others batch',
                         type = int,
-                        default = 1)
+                        default = 0)
 
     args = parser.parse_args()
 
@@ -55,7 +54,6 @@ def setup(args):
     """
     args = parse_args()    
     cfg.merge_from_file(args.cfg)
-    # cfg.freeze()
 
     return cfg
 
@@ -82,8 +80,7 @@ def eval(model, device, test_dataloader, logger, evaluator):
     for idx, (image, img_whwh, target) in enumerate(test_dataloader):
         image = image.to(device)
         img_whwh = img_whwh.to(device)
-    
-        y = model(image, img_whwh)
+        y = model(image.float(), img_whwh)
 
         for t in target:
             for k in t.keys():
@@ -93,17 +90,14 @@ def eval(model, device, test_dataloader, logger, evaluator):
         for j in range(y[1].shape[0]):
             _t = target[j]
             y[1][j] *= torch.Tensor([_t['width'], _t['height'], _t['width'], _t['height']]).to(device)/_t['image_size_xyxy'] 
-
         evaluator.process(target, y)
         if idx % 100 == 0:
             msg = 'Evaluation: [{0}/{1}]'.format(
                       idx, len(test_dataloader),
                   )
             logger.info(msg)
-        # break
 
     ret = evaluator.evaluate()
-    # print(ret)
     logger.info('AP : {AP:.3f}, AP50 : {AP50:.3f}, AP75 : {AP75:.3f}'.format(
                     AP=ret["bbox"]["AP"],
                     AP50=ret["bbox"]["AP50"],
@@ -123,11 +117,9 @@ def train_one_epoch(epoch, model, device, criterion, train_dataloader, optimizer
     total_losses = AverageMeter()
 
     for i, (image, img_whwh, target) in enumerate(train_dataloader):
-
         image = image.to(device)
         img_whwh = img_whwh.to(device)
         y = model(image, img_whwh)
-
         for t in target:
             for k in t.keys():
                 if k in ['gt_boxes', 'gt_classes', 'image_size_xyxy', 'image_size_xyxy_tgt']:
@@ -150,30 +142,26 @@ def train_one_epoch(epoch, model, device, criterion, train_dataloader, optimizer
                 loss[k] *= weight_dict['loss_giou']
                 loss_giou += loss[k]
             total_loss += loss[k]
-        
+
         optimizer.zero_grad()
         total_loss.backward()
         optimizer.step()
         lr_scheduler.step()
+        
 
         losses_ce.update(loss_ce.cpu().data.numpy())
         losses_bbox.update(loss_bbox.cpu().data.numpy())
         losses_giou.update(loss_giou.cpu().data.numpy())
         total_losses.update(total_loss.cpu().data.numpy())
         if i % cfg.TRAIN_PRINT_FREQ == 0:
-            msg = 'Epoch: [{0}][{1}/{2}]\t' \
-                  'Total Loss: {total_losses.avg:.3f}\t' \
-                  'Loss_ce: {losses_ce.avg:.3f}\t' \
-                  'Loss_bbox: {losses_bbox.avg:.3f}\t' \
-                  'Loss_giou: {losses_giou.avg:.3f}'.format(
+            msg = 'Epoch: [{0}][{1}/{2}]  ' \
+                  'Total Loss: {total_loss:.3f}  '.format(
                       epoch, i, len(train_dataloader),
-                      total_losses = total_losses,
-                      losses_ce = losses_ce,
-                      losses_bbox = losses_bbox,
-                      losses_giou = losses_giou
+                      total_loss = total_loss,
                   )
+            for k in loss.keys():
+                msg += k + ': %.4f  '%(loss[k])
             logger.info(msg)
-        # break
 
 def train(args):
     cfg = setup(args)
@@ -211,16 +199,24 @@ def train(args):
     ])
 
     model = SparseRCNN(cfg)
+    # from thop import profile
+    # x = torch.Tensor(1,3,224,224)
+    # wh = torch.Tensor(1,4)
+    # macs, params = profile(model, inputs=(x, wh))
+    # print(macs, params)
 
     start_epoch = 0
     if args.weights != '':
-        state_dict = torch.load(args.weights, map_location='cpu')#['model']
+        state_dict = torch.load(args.weights, map_location='cpu')['model']
         # start_epoch = state_dict['Epoch']
         new_state_dict = {}
         # for k, v in state_dict['state_dict'].items():
         #     new_state_dict[k[7:]] = v
         for k, v in state_dict.items():
-            if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
+            # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
+            # if 'head.head_series.3' in k or 'head.head_series.4' in k or 'head.head_series.5' in k:
+            #     continue
+            if ('fpn' in k or 'shortcut' in k) and 'norm' not in k:
                 if 'weight' in k:
                     new_state_dict[k.replace('weight', 'conv2d.weight')] = v
                 if 'bias' in k:
@@ -256,7 +252,6 @@ def train(args):
         evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], logger)
     else:
         raise('dataset not support!!!')
-
     train_loader = torch.utils.data.DataLoader(
         train_dataset, 
         num_workers=cfg.DATALOADER.NUM_WORKERS,
@@ -267,7 +262,7 @@ def train(args):
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset, 
-        batch_size=1, #args.num_gpus, 
+        batch_size=1,
         shuffle=False,
         num_workers=cfg.DATALOADER.NUM_WORKERS,
         pin_memory=True,
@@ -283,12 +278,6 @@ def train(args):
 
     optimizer = build_optimizer(cfg, model)
     lr_scheduler = build_lr_scheduler(cfg, optimizer)
-
-    start_epoch = 0
-    if args.weights != '':
-        state_dict = torch.load(args.weights)
-        start_epoch = state_dict['Epoch']
-        model.load_state_dict(state_dict['state_dict'])
     
     MAXEPOCH = int(cfg.SOLVER.MAX_ITER) // len(train_loader) + 1
     logger.info('MAXEPOCH : %d'%MAXEPOCH)

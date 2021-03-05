@@ -74,6 +74,7 @@ class CocoDataset(Dataset):
         self.mode = dataset.split('_')[-1]
         self.dataset = dataset.split('_')[-1]+dataset.split('_')[-2]
         self.coco = COCO(self._get_anno_file_name())
+        # self.ids = list(self.coco.imgs.keys())
 
         self.ids = []
         ids = list(self.coco.imgs.keys())
@@ -148,7 +149,8 @@ class CocoDataset(Dataset):
             cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
         )
         h, w, _ = img.shape
-        
+        # if float(w)/h != self.image_aspect_ratio(index):
+        #     print(file_name, h, w, self.coco.loadImgs(self.ids[index])[0]['width'], self.coco.loadImgs(self.ids[index])[0]['height'])
         if self.transform is not None:
             img = self.transform(img)
         if self.is_rgb == "RGB":
@@ -159,8 +161,20 @@ class CocoDataset(Dataset):
         img = img.transpose(2, 0, 1)
         img = torch.from_numpy(img)
         img_whwh = torch.as_tensor([img.shape[2], img.shape[1], img.shape[2], img.shape[1]])
+        # print(target)
         gt_boxes = [[t['bbox'][0], t['bbox'][1], t['bbox'][0]+t['bbox'][2], t['bbox'][1]+t['bbox'][3]] for t in target]
         gt_classes = [coco_id_idx_map.index(t['category_id']) for t in target]
+        # if len(gt_classes) == 0:
+        #     label = {'num_instances': len(gt_classes),
+        #             'image_id': img_id,
+        #             'height': h,
+        #             'width': w,
+        #             'gt_boxes': torch.Tensor(gt_boxes),
+        #             'gt_classes': torch.LongTensor(gt_classes),
+        #             'image_size_xyxy': img_whwh,
+        #             'image_size_xyxy_tgt': img_whwh.unsqueeze(0).repeat(len(gt_boxes), 1)
+        #             }
+        #     return img, img_whwh, label
 
         label = {'num_instances': len(gt_classes),
                   'image_id': img_id,

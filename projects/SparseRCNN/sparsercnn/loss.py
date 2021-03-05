@@ -107,10 +107,8 @@ class SetCriterion(nn.Module):
         image_size = torch.cat([v["image_size_xyxy_tgt"] for v in targets])
         src_boxes_ = src_boxes / image_size
         target_boxes_ = target_boxes / image_size
-
         loss_bbox = F.l1_loss(src_boxes_, target_boxes_, reduction='none')
         losses['loss_bbox'] = loss_bbox.sum() / num_boxes
-
         return losses
 
 
@@ -142,10 +140,8 @@ class SetCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
-
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
-        # print(indices)
 
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum(len(t["gt_classes"]) for t in targets)
@@ -258,7 +254,6 @@ class HungarianMatcher(nn.Module):
         image_size_out = torch.cat([v["image_size_xyxy"].unsqueeze(0) for v in targets])
         image_size_out = image_size_out.unsqueeze(1).repeat(1, num_queries, 1).flatten(0, 1)
         image_size_tgt = torch.cat([v["image_size_xyxy_tgt"] for v in targets])
-        # print(out_bbox)
         out_bbox_ = out_bbox / image_size_out
         tgt_bbox_ = tgt_bbox / image_size_tgt
         cost_bbox = torch.cdist(out_bbox_, tgt_bbox_, p=1)

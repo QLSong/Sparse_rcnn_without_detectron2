@@ -1,23 +1,25 @@
 MODEL:
   BACKBONE:
     NAME: 'build_resnet_torchvision_fpn_backbone'
+    # NAME: 'build_mobilenet_fpn_backbone'
+  WEIGHTS: "R-18.pkl"
   RESNETS:
-    DEPTH: 50
+    DEPTH: 18
+    RES2_OUT_CHANNELS: 64
     STRIDE_IN_1X1: False
   SparseRCNN:
-    NUM_PROPOSALS: 100 #20
+    NUM_PROPOSALS: 100 #40
+    # NUM_HEADS: 3
     NUM_CLASSES: 1
+  ROI_BOX_HEAD:
+    POOLER_TYPE: "ROIPool"
 DATASETS:
   TRAIN: ("voc_2007_train",)
   TEST:  ("voc_2007_val",)
-  # TRAIN: ("coco_2017_train",)
-  # TEST:  ("coco_2017_val",)
 SOLVER:
   IMS_PER_BATCH: 5
-  # STEPS: (21000, 23000)
-  # MAX_ITER: 25000
-  STEPS: (210000, 250000)
-  MAX_ITER: 270000
+  STEPS: (50000, 55000)
+  MAX_ITER: 60000
 INPUT:
   CROP:
     ENABLED: False

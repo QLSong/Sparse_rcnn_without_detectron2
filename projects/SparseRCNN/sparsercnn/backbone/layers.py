@@ -201,6 +201,7 @@ class Conv2d(nn.Module):
                             bias=bias)
         self.norm = norm
         self.activation = activation
+        self.stride = stride
 
     def forward(self, x):
         # torchscript does not support SyncBatchNorm yet
