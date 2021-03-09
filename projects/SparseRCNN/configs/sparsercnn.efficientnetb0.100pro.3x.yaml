@@ -1,9 +1,7 @@
 MODEL:
   BACKBONE:
-    NAME: 'build_resnet_torchvision_fpn_backbone'
-  WEIGHTS: "R-18.pkl"
+    NAME: 'build_efficientnet_fpn_backbone'
   RESNETS:
-    DEPTH: 18
     RES2_OUT_CHANNELS: 64
     STRIDE_IN_1X1: False
   SparseRCNN:

@@ -281,6 +281,7 @@ def train(args):
     
     MAXEPOCH = int(cfg.SOLVER.MAX_ITER) // len(train_loader) + 1
     logger.info('MAXEPOCH : %d'%MAXEPOCH)
+    max_ap = 0
     for epoch in range(start_epoch, MAXEPOCH):
         train_one_epoch(epoch, model, device, criterion, train_loader, optimizer, lr_scheduler, logger)
 
@@ -289,9 +290,12 @@ def train(args):
         torch.save(state, cfg.OUTPUT_DIR + '/model_final.pth.tar')
         logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_final.pth.tar')
         
-        if epoch % 10 == 0 and epoch != 0:
+        if (epoch + 1) % 1 == 0:
             evaluator.reset()
-            eval(model.module, device, test_loader, logger, evaluator)
+            ap = eval(model.module, device, test_loader, logger, evaluator)
+            if ap > max_ap:
+                torch.save(state, cfg.OUTPUT_DIR + '/model_best.pth.tar')
+                max_ap = ap
 
 
 if __name__ == '__main__':
