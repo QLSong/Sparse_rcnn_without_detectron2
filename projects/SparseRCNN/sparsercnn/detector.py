@@ -93,6 +93,9 @@ class SparseRCNN(nn.Module):
         elif cfg.MODEL.BACKBONE.NAME == 'build_pelee_fpn_backbone':
             from .backbone.pelee import PeleeNet
             bottom_up = PeleeNet()
+        elif cfg.MODEL.BACKBONE.NAME == 'build_efficientnet_fpn_backbone':
+            from .backbone.efficientnet import EfficientNet
+            bottom_up = EfficientNet.from_pretrained('efficientnet-b0')
         else:
             raise('not support backbone!!!')
 
