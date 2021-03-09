@@ -1,6 +1,6 @@
 MODEL:
   BACKBONE:
-    NAME: 'build_resnet_torchvision_fpn_backbone'
+    NAME: 'build_resnet18_torchvision_fpn_backbone'
   WEIGHTS: "R-18.pkl"
   RESNETS:
     DEPTH: 18

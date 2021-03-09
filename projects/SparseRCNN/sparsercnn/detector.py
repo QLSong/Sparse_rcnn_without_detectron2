@@ -84,9 +84,12 @@ class SparseRCNN(nn.Module):
                         elif 'fc' not in k:
                             state_dict[k] = torch.from_numpy(v).float()
                     bottom_up.load_state_dict(state_dict)
-        elif cfg.MODEL.BACKBONE.NAME == 'build_resnet_torchvision_fpn_backbone':
+        elif cfg.MODEL.BACKBONE.NAME == 'build_resnet18_torchvision_fpn_backbone':
             from .backbone.resnet_torchvision import resnet18
             bottom_up = resnet18(pretrained=True)
+        elif cfg.MODEL.BACKBONE.NAME == 'build_resnet50_torchvision_fpn_backbone':
+            from .backbone.resnet_torchvision import resnet50
+            bottom_up = resnet50(pretrained=True)
         elif cfg.MODEL.BACKBONE.NAME == 'build_mobilenet_fpn_backbone':
             from .backbone.mobilenet import mobilenet_v2
             bottom_up = mobilenet_v2(pretrained=True)
