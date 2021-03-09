@@ -102,7 +102,7 @@ def eval(model, device, test_dataloader, logger, evaluator):
                     AP=ret["bbox"]["AP"],
                     AP50=ret["bbox"]["AP50"],
                     AP75=ret["bbox"]["AP75"]))
-    return 
+    return ret["bbox"]["AP"]
 
 def train_one_epoch(epoch, model, device, criterion, train_dataloader, optimizer, lr_scheduler, logger):
     model.train()
