@@ -4,9 +4,10 @@ import numpy as np
 
 class Collate(object):
     def __init__(self, cfg, size_divisibility=32):
-        pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(3, 1, 1)
-        pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).view(3, 1, 1)
-        self.normalizer = lambda x: (x - pixel_mean) / pixel_std
+        self.pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).view(3, 1, 1)
+        self.pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).view(3, 1, 1)
+        # self.normalizer = lambda x: (x - pixel_mean) / pixel_std
+        # self.
         self.size_divisibility = size_divisibility
         self.pad_value = 0
     
@@ -15,10 +16,10 @@ class Collate(object):
         assert len(img) == len(img_whwh)
         assert len(img) == len(target)
 
-        img = [self.normalizer(_img) for _img in img]
+        img = [(_img - self.pixel_mean)/self.pixel_std for _img in img]
+        # img = [self.normalizer(_img) for _img in img]
 
         image_sizes = torch.as_tensor([[im.shape[-2], im.shape[-1]] for im in img])
-
         max_size = image_sizes.max(0)[0].int().tolist()
 
         if self.size_divisibility > 1:

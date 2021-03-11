@@ -184,11 +184,12 @@ class CocoDataset(Dataset):
         fmt_str += '    Root Location: {}\n'.format(self.root)
         tmp = '    Transforms (if any): '
         fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
-        tmp = '    Target Transforms (if any): '
-        fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        # tmp = '    Target Transforms (if any): '
+        # fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         return fmt_str
 
 if __name__ == '__main__':
     dataset = CocoDataset('datasets/coco', 'train2017')
+    print(dataset)
     print(dataset[0][0].shape)
     print(dataset[0][1])
