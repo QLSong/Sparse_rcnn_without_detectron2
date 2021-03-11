@@ -158,6 +158,7 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.expand_ratio = block.expansion
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -178,10 +179,10 @@ class ResNet(nn.Module):
         self.input_shape = input_shape
 
     def output_shape(self):
-        return {'res2': ShapeSpec(stride=4, channels=64), 
-                'res3': ShapeSpec(stride=8, channels=128), 
-                'res4': ShapeSpec(stride=16, channels=256), 
-                'res5': ShapeSpec(stride=32, channels=512)}
+        return {'res2': ShapeSpec(stride=4, channels=64 * self.expand_ratio), 
+                'res3': ShapeSpec(stride=8, channels=128 * self.expand_ratio), 
+                'res4': ShapeSpec(stride=16, channels=256 * self.expand_ratio), 
+                'res5': ShapeSpec(stride=32, channels=512 * self.expand_ratio)}
 
     def _make_layer(self, block, planes, blocks, stride=1, dilate=False):
         norm_layer = self._norm_layer
@@ -255,7 +256,7 @@ def resnet34(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-def resnet50(pretrained=False, progress=True, **kwargs):
+def resnet50(pretrained=False, progress=True, input_shape=None, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -263,7 +264,7 @@ def resnet50(pretrained=False, progress=True, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
+    return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, input_shape, progress,
                    **kwargs)
 
 
