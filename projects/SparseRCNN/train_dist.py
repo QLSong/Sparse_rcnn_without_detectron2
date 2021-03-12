@@ -395,7 +395,7 @@ def main_worker(gpu,gpuNum, args):
 
     if args.eval_only:
         evaluator.reset()
-        eval(model.module, device, test_loader, logger, evaluator)
+        eval(model, device, test_loader, logger, evaluator)
         return
 
     criterion = Loss(cfg).cuda(device)
@@ -420,7 +420,7 @@ def main_worker(gpu,gpuNum, args):
         #     evaluator.reset()
         #     if not args.multiprocessing_distributed or (args.multiprocessing_distributed
         #         and args.rank % args.num_gpus == 0):
-        #         ap = eval(model.module, device, test_loader, logger, evaluator)
+        #         ap = eval(model, device, test_loader, logger, evaluator)
         #         if ap > max_ap:
         #             torch.save(state, cfg.OUTPUT_DIR + '/model_best.pth.tar')
         #             max_ap = ap

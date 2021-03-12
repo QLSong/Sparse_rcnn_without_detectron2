@@ -285,7 +285,7 @@ def train(args):
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset, 
-        batch_size=1,
+        batch_size=2*args.num_gpus,
         shuffle=False,
         num_workers=cfg.DATALOADER.NUM_WORKERS,
         pin_memory=True,
@@ -294,7 +294,7 @@ def train(args):
 
     if args.eval_only:
         evaluator.reset()
-        eval(model.module, device, test_loader, logger, evaluator)
+        eval(model, device, test_loader, logger, evaluator)
         return
 
     criterion = Loss(cfg).cuda()
@@ -315,9 +315,10 @@ def train(args):
         
         if (epoch + 1) % 1 == 0:
             evaluator.reset()
-            ap = eval(model.module, device, test_loader, logger, evaluator)
+            ap = eval(model, device, test_loader, logger, evaluator)
             if ap > max_ap:
                 torch.save(state, cfg.OUTPUT_DIR + '/model_best.pth.tar')
+                logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_best.pth.tar')
                 max_ap = ap
 
 

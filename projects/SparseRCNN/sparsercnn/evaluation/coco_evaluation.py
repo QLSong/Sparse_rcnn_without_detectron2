@@ -97,7 +97,7 @@ class COCOEvaluator:
         """
         for i in range(outputs[0].shape[0]):
             prediction = {"image_id": targets[i]['image_id']}
-            prediction["instances"] = instances_to_coco_json(outputs, targets[i]['image_id'])
+            prediction["instances"] = instances_to_coco_json([outputs[0][i], outputs[1][i], outputs[2][i]], targets[i]['image_id'])
             self._predictions.append(prediction)
 
     def evaluate(self, img_ids=None):
@@ -282,13 +282,13 @@ def instances_to_coco_json(instances, img_id):
     Returns:
         list[dict]: list of json annotations in COCO format.
     """
-    num_instance = instances[0][0].shape[0]
+    num_instance = instances[0].shape[0]
     if num_instance == 0:
         return []
 
-    boxes = box_xyxy_to_xywh(instances[1][0]).cpu().tolist()
-    scores = instances[0][0].cpu().tolist()
-    classes = instances[2][0].cpu().tolist()
+    boxes = box_xyxy_to_xywh(instances[1]).cpu().tolist()
+    scores = instances[0].cpu().tolist()
+    classes = instances[2].cpu().tolist()
     # print(len(boxes), len(scores), len(classes))
 
     results = []
