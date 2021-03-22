@@ -114,7 +114,7 @@ class ROIPooler(nn.Module):
         if pooler_type == "ROIAlignV2":
             self.level_poolers = nn.ModuleList(
                 RoIAlign(
-                    output_size, spatial_scale=scale, sampling_ratio=sampling_ratio, aligned=True
+                    output_size, spatial_scale=scale, sampling_ratio=sampling_ratio#, aligned=True
                 )
                 for scale in scales
             )
@@ -161,11 +161,11 @@ class ROIPooler(nn.Module):
         assert isinstance(x, list) and isinstance(
             box_lists, list
         ), "Arguments to pooler must be lists"
-        assert (
-            len(x) == num_level_assignments
-        ), "unequal value, num_level_assignments={}, but x is list of {} Tensors".format(
-            num_level_assignments, len(x)
-        )
+        # assert (
+        #     len(x) == num_level_assignments
+        # ), "unequal value, num_level_assignments={}, but x is list of {} Tensors".format(
+        #     num_level_assignments, len(x)
+        # )
 
         assert len(box_lists) == x[0].size(
             0

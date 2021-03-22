@@ -76,6 +76,9 @@ class AverageMeter(object):
 
 def eval(model, device, test_dataloader, logger, evaluator):
     model.eval()
+    # box_use_num = [0]*300
+    # import numpy as np
+    # label_num = np.zeros((100, 80))
     
     for idx, (image, img_whwh, target) in enumerate(test_dataloader):
         image = image.to(device)
@@ -90,13 +93,18 @@ def eval(model, device, test_dataloader, logger, evaluator):
         for j in range(y[1].shape[0]):
             _t = target[j]
             y[1][j] *= torch.Tensor([_t['width'], _t['height'], _t['width'], _t['height']]).to(device)/_t['image_size_xyxy'] 
+            # for k, _y in enumerate(y[0][j]):
+            #     if _y > 0.5:
+            #         box_use_num[k] += 1
+                    # label_num[k][y[2][j][k]] += 1
         evaluator.process(target, y)
         if idx % 100 == 0:
             msg = 'Evaluation: [{0}/{1}]'.format(
                       idx, len(test_dataloader),
                   )
             logger.info(msg)
-
+    # print(box_use_num)
+    # exit()
     ret = evaluator.evaluate()
     logger.info('AP : {AP:.3f}, AP50 : {AP50:.3f}, AP75 : {AP75:.3f}'.format(
                     AP=ret["bbox"]["AP"],
@@ -211,7 +219,7 @@ def train(args):
             state_dict = torch.load(args.weights, map_location='cpu')
             new_state_dict = {}
             for k, v in state_dict['state_dict'].items():
-                new_state_dict[k[7:]] = v
+                new_state_dict[k[7:] if k.startswith('module.') else k] = v
             start_epoch = state_dict['Epoch']
         else:
             state_dict = torch.load(args.weights, map_location='cpu')['model']
@@ -232,22 +240,6 @@ def train(args):
         # state_dict = torch.load(args.weights, map_location='cpu')
         model.load_state_dict(new_state_dict)
 
-        # new_state_dict = {}
-        # for k, v in state_dict['state_dict'].items():
-        #     new_state_dict[k[7:]] = v
-        # # for k, v in state_dict.items():
-        # #     # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
-        # #     # if 'head.head_series.3' in k or 'head.head_series.4' in k or 'head.head_series.5' in k:
-        # #     #     continue
-        # #     if ('fpn' in k or 'shortcut' in k) and 'norm' not in k:
-        # #         if 'weight' in k:
-        # #             new_state_dict[k.replace('weight', 'conv2d.weight')] = v
-        # #         if 'bias' in k:
-        # #             new_state_dict[k.replace('bias', 'conv2d.bias')] = v
-        # #     else:
-        # #         new_state_dict[k] = v
-        # model.load_state_dict(new_state_dict)
-
     if cfg.MODEL.DEVICE == 'cuda':
         model = model.cuda()
         if not args.standard_size and args.num_gpus > 1:
@@ -267,12 +259,12 @@ def train(args):
         train_dataset = VOCDataset(cfg, 'train', transforms)
         test_dataset = VOCDataset(cfg, 'val', test_transforms)
         train_sampler = RandomSampler(train_dataset, batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, drop_last=True)
-        evaluator = PascalVOCDetectionEvaluator(cfg.DATASETS.TEST[0], logger)
+        evaluator = PascalVOCDetectionEvaluator(cfg.BASE_ROOT, cfg.DATASETS.TEST[0], logger)
     elif cfg.DATASETS.TRAIN[0].startswith('coco'):
         train_dataset = CocoDataset(cfg, 'train', transforms)
         test_dataset = CocoDataset(cfg, 'val', test_transforms)
         train_sampler = AspectRatioBasedSampler(train_dataset, batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, drop_last=True)
-        evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], logger)
+        evaluator = COCOEvaluator(cfg.BASE_ROOT, cfg.DATASETS.TEST[0], logger)
     else:
         raise('dataset not support!!!')
     train_loader = torch.utils.data.DataLoader(
@@ -285,7 +277,7 @@ def train(args):
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset, 
-        batch_size=2*args.num_gpus,
+        batch_size=1*args.num_gpus,
         shuffle=False,
         num_workers=cfg.DATALOADER.NUM_WORKERS,
         pin_memory=True,

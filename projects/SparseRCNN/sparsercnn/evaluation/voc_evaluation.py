@@ -73,14 +73,14 @@ class PascalVOCDetectionEvaluator:
     official API.
     """
 
-    def __init__(self, dataset_name, logger):
+    def __init__(self, root, dataset_name, logger):
         """
         Args:
             dataset_name (str): name of the dataset, e.g., "voc_2007_test"
         """
         self._dataset_name = dataset_name
         meta_year = dataset_name.split('_')[1]
-        meta_dir = './datasets/VOC2007'
+        meta_dir = root
         self._anno_file_template = os.path.join(meta_dir, "Annotations", "{}.xml")
         self._image_set_path = os.path.join(meta_dir, "ImageSets", "Main", "val.txt")
         self._class_names = class_names
@@ -248,8 +248,13 @@ def voc_eval(detpath, annopath, imagesetfile, classname, ovthresh=0.5, use_07_me
 
     # first load gt
     # read list of images
-    with open(imagesetfile, "r") as f:
-        lines = f.readlines()
+    try:
+        with open(imagesetfile, "r") as f:
+            lines = f.readlines()
+    except:
+        imagesetfile = imagesetfile.replace('/Main', '')
+        with open(imagesetfile, "r") as f:
+            lines = f.readlines()
     imagenames = [x.strip() for x in lines]
 
     # load annots

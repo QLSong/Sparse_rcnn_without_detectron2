@@ -31,6 +31,7 @@ class COCOEvaluator:
 
     def __init__(
         self,
+        root,
         dataset_name,
         logger
     ):
@@ -75,7 +76,7 @@ class COCOEvaluator:
         cache_path = os.path.join(self._output_dir, f"{dataset_name}_coco_format.json")
         self.json_file = cache_path
 
-        json_file = './datasets/coco/annotations/instances_val2017.json'
+        json_file = root + '/annotations/instances_val2017.json'
         self._coco_api = COCO(json_file)
 
         # Test set json files do not contain annotations (evaluation must be
@@ -145,12 +146,12 @@ class COCOEvaluator:
         coco_results = list(itertools.chain(*[x["instances"] for x in predictions]))
         tasks = self._tasks or self._tasks_from_predictions(coco_results)
 
-        if self._output_dir:
-            file_path = os.path.join(self._output_dir, "coco_instances_results.json")
-            self._logger.info("Saving results to {}".format(file_path))
-            with open(file_path, "w") as f:
-                f.write(json.dumps(coco_results))
-                f.flush()
+        # if self._output_dir:
+        #     file_path = os.path.join(self._output_dir, "coco_instances_results.json")
+        #     self._logger.info("Saving results to {}".format(file_path))
+        #     with open(file_path, "w") as f:
+        #         f.write(json.dumps(coco_results))
+        #         f.flush()
 
         for task in sorted(tasks):
             coco_eval = (

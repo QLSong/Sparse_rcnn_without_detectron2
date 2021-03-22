@@ -355,7 +355,7 @@ def main_worker(gpu,gpuNum, args):
         train_dataset = VOCDataset(cfg, 'train', transforms)
         test_dataset = VOCDataset(cfg, 'val', test_transforms)
         train_sampler = RandomSampler(train_dataset, batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, drop_last=True)
-        evaluator = PascalVOCDetectionEvaluator(cfg.DATASETS.TEST[0], logger)
+        evaluator = PascalVOCDetectionEvaluator(cfg.BASE_ROOT, cfg.DATASETS.TEST[0], logger)
     elif cfg.DATASETS.TRAIN[0].startswith('coco'):
         train_dataset = CocoDataset(cfg, 'train', transforms)
         test_dataset = CocoDataset(cfg, 'val', test_transforms)
@@ -363,7 +363,7 @@ def main_worker(gpu,gpuNum, args):
             train_sampler = DistributedGroupSampler(train_dataset, samples_per_gpu=args.batch_size)
         else:
             train_sampler = AspectRatioBasedSampler(train_dataset, batch_size=cfg.SOLVER.IMS_PER_BATCH * args.num_gpus, drop_last=True)
-        evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], logger)
+        evaluator = COCOEvaluator(cfg.BASE_ROOT, cfg.DATASETS.TEST[0], logger)
     else:
         raise('dataset not support!!!')
     
@@ -384,14 +384,14 @@ def main_worker(gpu,gpuNum, args):
     #     batch_sampler=train_sampler
     # )
 
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset, 
-        batch_size=1,
-        shuffle=False,
-        num_workers=cfg.DATALOADER.NUM_WORKERS,
-        pin_memory=True,
-        collate_fn=Collate(cfg)
-    )
+    # test_loader = torch.utils.data.DataLoader(
+    #     test_dataset, 
+    #     batch_size=1,
+    #     shuffle=False,
+    #     num_workers=cfg.DATALOADER.NUM_WORKERS,
+    #     pin_memory=True,
+    #     collate_fn=Collate(cfg)
+    # )
 
     if args.eval_only:
         evaluator.reset()
@@ -411,11 +411,12 @@ def main_worker(gpu,gpuNum, args):
             train_sampler.set_epoch(epoch)
         train_one_epoch(epoch, model, device, criterion, train_loader, optimizer, lr_scheduler, logger)
 
-        state = {'Epoch' : epoch,
-                 'state_dict' : model.state_dict()}
-        torch.save(state, cfg.OUTPUT_DIR + '/model_final_' + str(epoch) + '.pth.tar')
-        logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_final.pth.tar')
-        
+        if args.rank == 0:
+            state = {'Epoch' : epoch,
+                    'state_dict' : model.module.state_dict()}
+            torch.save(state, cfg.OUTPUT_DIR + '/model_final_' + str(epoch) + '.pth.tar')
+            logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_final.pth.tar')
+
         # if (epoch + 1) % 1 == 0:
         #     evaluator.reset()
         #     if not args.multiprocessing_distributed or (args.multiprocessing_distributed
@@ -423,6 +424,7 @@ def main_worker(gpu,gpuNum, args):
         #         ap = eval(model, device, test_loader, logger, evaluator)
         #         if ap > max_ap:
         #             torch.save(state, cfg.OUTPUT_DIR + '/model_best.pth.tar')
+        #             logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_best.pth.tar')
         #             max_ap = ap
 
 

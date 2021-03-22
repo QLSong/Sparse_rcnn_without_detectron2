@@ -30,19 +30,25 @@ class VOCDataset(data.Dataset):
             dataset = cfg.DATASETS.TEST[0]
         self.is_rgb = cfg.INPUT.FORMAT
         
-        root = './datasets/VOC2007'
+        root = cfg.BASE_ROOT
         self.transform = transform
         self.images_root = os.path.join(root, 'JPEGImages')
         self.annotations_root = os.path.join(root, 'Annotations')
 
         if mode == 'train':
-            traintxt = open(os.path.join(root, 'ImageSets', 'Main', 'train.txt'), 'r')
+            try:
+                traintxt = open(os.path.join(root, 'ImageSets', 'Main', 'train.txt'), 'r')
+            except:
+                traintxt = open(os.path.join(root, 'ImageSets', 'train.txt'), 'r')
             self.data_list = []
             for _l in traintxt:
                 self.data_list.append(_l.replace('\n', ''))
         
         else:
-            valtxt = open(os.path.join(root, 'ImageSets', 'Main', 'val.txt'), 'r')
+            try:
+                valtxt = open(os.path.join(root, 'ImageSets', 'Main', 'val.txt'), 'r')
+            except:
+                valtxt = open(os.path.join(root, 'ImageSets', 'val.txt'), 'r')
             self.data_list = []
             for _l in valtxt:
                 self.data_list.append(_l.replace('\n', ''))

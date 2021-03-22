@@ -70,7 +70,7 @@ class CocoDataset(Dataset):
             dataset = cfg.DATASETS.TEST[0]
         self.is_rgb = cfg.INPUT.FORMAT
         self.name = 'COCO'
-        self.root = './datasets/coco'
+        self.root = cfg.BASE_ROOT
         self.mode = dataset.split('_')[-1]
         self.dataset = dataset.split('_')[-1]+dataset.split('_')[-2]
         self.coco = COCO(self._get_anno_file_name())
