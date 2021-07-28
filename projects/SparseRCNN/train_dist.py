@@ -273,6 +273,8 @@ def main_worker(gpu,gpuNum, args):
     ])
 
     model = SparseRCNN(cfg)
+    optimizer = build_optimizer(cfg, model)
+    lr_scheduler = build_lr_scheduler(cfg, optimizer)
     # from thop import profile
     # x = torch.Tensor(1,3,224,224)
     # wh = torch.Tensor(1,4)
@@ -284,13 +286,13 @@ def main_worker(gpu,gpuNum, args):
             state_dict = torch.load(args.weights, map_location='cpu')
             new_state_dict = {}
             for k, v in state_dict['state_dict'].items():
-                new_state_dict[k[7:]] = v
+                new_state_dict[k[7:] if k.startswith('module.') else k] = v
             start_epoch = state_dict['Epoch']
+            optimizer.load_state_dict(state_dict['optimizer'])
         else:
             state_dict = torch.load(args.weights, map_location='cpu')['model']
             new_state_dict = {}
-            # for k, v in state_dict['state_dict'].items():
-            #     new_state_dict[k[7:]] = v
+
             for k, v in state_dict.items():
                 # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
                 # if 'head.head_series.3' in k or 'head.head_series.4' in k or 'head.head_series.5' in k:
@@ -305,21 +307,7 @@ def main_worker(gpu,gpuNum, args):
         # state_dict = torch.load(args.weights, map_location='cpu')
         model.load_state_dict(new_state_dict)
     print("load model with rank ", args.rank, " gpu ", device )
-        # new_state_dict = {}
-        # for k, v in state_dict['state_dict'].items():
-        #     new_state_dict[k[7:]] = v
-        # # for k, v in state_dict.items():
-        # #     # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
-        # #     # if 'head.head_series.3' in k or 'head.head_series.4' in k or 'head.head_series.5' in k:
-        # #     #     continue
-        # #     if ('fpn' in k or 'shortcut' in k) and 'norm' not in k:
-        # #         if 'weight' in k:
-        # #             new_state_dict[k.replace('weight', 'conv2d.weight')] = v
-        # #         if 'bias' in k:
-        # #             new_state_dict[k.replace('bias', 'conv2d.bias')] = v
-        # #     else:
-        # #         new_state_dict[k] = v
-        # model.load_state_dict(new_state_dict)
+
     if args.multiprocessing_distributed:
         if args.gpu is not None:
             torch.cuda.set_device(device)
@@ -376,32 +364,12 @@ def main_worker(gpu,gpuNum, args):
         sampler=train_sampler
     )
 
-    # train_loader = torch.utils.data.DataLoader(
-    #     train_dataset, 
-    #     num_workers=cfg.DATALOADER.NUM_WORKERS,
-    #     pin_memory=True,
-    #     collate_fn=Collate(cfg),
-    #     batch_sampler=train_sampler
-    # )
-
-    # test_loader = torch.utils.data.DataLoader(
-    #     test_dataset, 
-    #     batch_size=1,
-    #     shuffle=False,
-    #     num_workers=cfg.DATALOADER.NUM_WORKERS,
-    #     pin_memory=True,
-    #     collate_fn=Collate(cfg)
-    # )
-
     if args.eval_only:
         evaluator.reset()
         eval(model, device, test_loader, logger, evaluator)
         return
 
     criterion = Loss(cfg).cuda(device)
-
-    optimizer = build_optimizer(cfg, model)
-    lr_scheduler = build_lr_scheduler(cfg, optimizer)
     
     MAXEPOCH = int(cfg.SOLVER.MAX_ITER) // len(train_loader) + 1
     logger.info('MAXEPOCH : %d'%MAXEPOCH)
@@ -413,19 +381,15 @@ def main_worker(gpu,gpuNum, args):
 
         if args.rank == 0:
             state = {'Epoch' : epoch,
-                    'state_dict' : model.module.state_dict()}
+                    'state_dict' : model.module.state_dict(),
+                    'optimizer': optimizer.state_dict()}
             torch.save(state, cfg.OUTPUT_DIR + '/model_final_' + str(epoch) + '.pth.tar')
             logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_final.pth.tar')
 
-        # if (epoch + 1) % 1 == 0:
-        #     evaluator.reset()
-        #     if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-        #         and args.rank % args.num_gpus == 0):
-        #         ap = eval(model, device, test_loader, logger, evaluator)
-        #         if ap > max_ap:
-        #             torch.save(state, cfg.OUTPUT_DIR + '/model_best.pth.tar')
-        #             logger.info('saving models to ' + cfg.OUTPUT_DIR + '/model_best.pth.tar')
-        #             max_ap = ap
+            if (epoch + 1) % 1 == 0 :
+                import requests
+                response = requests.post('http://10.244.46.109:10111', json={'checkpoint':cfg.OUTPUT_DIR + '/model_final_' + str(epoch) + '.pth.tar', 'val_root':''})
+
 
 
 if __name__ == '__main__':
