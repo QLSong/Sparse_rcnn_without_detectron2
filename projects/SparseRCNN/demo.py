@@ -13,22 +13,22 @@ yaml = 'projects/SparseRCNN/configs/sparsercnn.res50.100pro.3x.yaml'
 cfg.merge_from_file(yaml)
 model = SparseRCNN(cfg).cuda()
 model.eval()
-state_dict = torch.load('/workspace/mnt/storage/songqinglong/song/project/SparseR-CNN/output/model_0179999.pth')["model"]
+state_dict = torch.load('/workspace/mnt/storage/songqinglong/code/project/Sparse_rcnn_without_detectron2/output/res50/model_final.pth.tar')['state_dict']#["model"]
 
-new_state_dict = {}
-# for k, v in state_dict['state_dict'].items():
-#     new_state_dict[k[7:]] = v
-for k, v in state_dict.items():
-    # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
-    if ('fpn' in k or 'shortcut' in k) and 'norm' not in k:
-        if 'weight' in k:
-            new_state_dict[k.replace('weight', 'conv2d.weight')] = v
-        if 'bias' in k:
-            new_state_dict[k.replace('bias', 'conv2d.bias')] = v
-    else:
-        new_state_dict[k] = v
+# new_state_dict = {}
+# # for k, v in state_dict['state_dict'].items():
+# #     new_state_dict[k[7:]] = v
+# for k, v in state_dict.items():
+#     # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
+#     if ('fpn' in k or 'shortcut' in k) and 'norm' not in k:
+#         if 'weight' in k:
+#             new_state_dict[k.replace('weight', 'conv2d.weight')] = v
+#         if 'bias' in k:
+#             new_state_dict[k.replace('bias', 'conv2d.bias')] = v
+#     else:
+#         new_state_dict[k] = v
     
-model.load_state_dict(new_state_dict)
+model.load_state_dict(state_dict, strict=False)
 
 def url_to_image(url):
     resp = urllib.request.urlopen(url)
@@ -84,7 +84,7 @@ def main(image_root):
         if score<0.8:
             continue
         print(score, label)
-        box = boxes[0, i].cpu().data.numpy()
+        box = boxes[0, i].cpu().data.numpy().astype(np.int32)
         cv2.rectangle(dst_image, (box[0],box[1]), (box[2],box[3]), (255,0,0))
         flag = True
     cv2.imwrite('../../data/car/zhuapai/dst/'+ image_root.split('/')[-1], dst_image)

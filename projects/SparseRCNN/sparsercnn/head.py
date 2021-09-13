@@ -48,8 +48,6 @@ class DynamicHead(nn.Module):
         rcnn_head = RCNNHead(cfg, d_model, num_classes, dim_feedforward, nhead, dropout, activation)        
         self.head_series = _get_clones(rcnn_head, num_heads)
         self.return_intermediate = cfg.MODEL.SparseRCNN.DEEP_SUPERVISION
-        self.box_num = [300, 300, 300, 100, 100, 100]
-        # self.box_num = [300, 300, 300, 300, 300, 300]
         
         # Init parameters.
         self.use_focal = cfg.MODEL.SparseRCNN.USE_FOCAL
@@ -106,7 +104,7 @@ class DynamicHead(nn.Module):
         proposal_features = init_features.clone()
         
         for _idx, rcnn_head in enumerate(self.head_series):
-            class_logits, pred_bboxes, proposal_features = rcnn_head(features, bboxes, proposal_features, self.box_pooler, self.box_num[_idx])
+            class_logits, pred_bboxes, proposal_features = rcnn_head(features, bboxes, proposal_features, self.box_pooler)
 
             if self.return_intermediate:
                 inter_class_logits.append(class_logits)
@@ -221,7 +219,7 @@ class RCNNHead(nn.Module):
         self.bbox_weights = bbox_weights
 
 
-    def forward(self, features, bboxes, pro_features, pooler, box_num):
+    def forward(self, features, bboxes, pro_features, pooler):
         """
         :param bboxes: (N, nr_boxes, 4)
         :param pro_features: (N, nr_boxes, d_model)
@@ -264,15 +262,6 @@ class RCNNHead(nn.Module):
         class_logits = self.class_logits(cls_feature).view(N, nr_boxes, -1)
         bboxes_deltas = self.bboxes_delta(reg_feature)
         pred_bboxes = self.apply_deltas(bboxes_deltas, bboxes.view(-1, 4)).view(N, nr_boxes, -1)
-
-        if nr_boxes != box_num:
-            scores, _ = class_logits.max(-1)
-            _, pred = torch.topk(scores, box_num)
-
-            class_logits = torch.cat([torch.index_select(class_logits[idx:idx+1], 1, pred[idx]) for idx in range(class_logits.shape[0])], 0)
-            pred_bboxes = torch.cat([torch.index_select(pred_bboxes[idx:idx+1], 1, pred[idx]) for idx in range(pred_bboxes.shape[0])], 0)
-            obj_features = obj_features.view(N, nr_boxes, -1)
-            obj_features = torch.cat([torch.index_select(obj_features[idx:idx+1], 1, pred[idx]) for idx in range(obj_features.shape[0])], 0)
         
         return class_logits, pred_bboxes, obj_features
     

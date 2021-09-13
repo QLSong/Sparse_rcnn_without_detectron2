@@ -215,30 +215,8 @@ def train(args):
 
     start_epoch = 0
     if args.weights != '':
-        if 'model' not in torch.load(args.weights, map_location='cpu'):
-            state_dict = torch.load(args.weights, map_location='cpu')
-            new_state_dict = {}
-            for k, v in state_dict['state_dict'].items():
-                new_state_dict[k[7:] if k.startswith('module.') else k] = v
-            start_epoch = state_dict['Epoch']
-        else:
-            state_dict = torch.load(args.weights, map_location='cpu')['model']
-            new_state_dict = {}
-            # for k, v in state_dict['state_dict'].items():
-            #     new_state_dict[k[7:]] = v
-            for k, v in state_dict.items():
-                # if ('conv' in k or 'fpn' in k or 'shortcut' in k) and 'norm' not in k:
-                # if 'head.head_series.3' in k or 'head.head_series.4' in k or 'head.head_series.5' in k:
-                #     continue
-                if ('fpn' in k or 'shortcut' in k) and 'norm' not in k:
-                    if 'weight' in k:
-                        new_state_dict[k.replace('weight', 'conv2d.weight')] = v
-                    if 'bias' in k:
-                        new_state_dict[k.replace('bias', 'conv2d.bias')] = v
-                else:
-                    new_state_dict[k] = v
-        # state_dict = torch.load(args.weights, map_location='cpu')
-        model.load_state_dict(new_state_dict)
+        state_dict = torch.load(args.weights, map_location='cpu')['state_dict']
+        model.load_state_dict(state_dict, strict=False)
 
     if cfg.MODEL.DEVICE == 'cuda':
         model = model.cuda()
