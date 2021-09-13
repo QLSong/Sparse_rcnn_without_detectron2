@@ -15,6 +15,9 @@
 - ln -s /path_to_coco_dataset/val2017 datasets/coco/val2017
 - ./train_coco.sh
 
+# pretrain model
+- https://pan.baidu.com/s/1pC_dvTBwMSVQV6pUaZRU2Q （提取码：e8ip）
+
 ## test
 - ./test.sh
 ![](images/test.png)
